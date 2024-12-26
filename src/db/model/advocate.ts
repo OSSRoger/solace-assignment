@@ -41,6 +41,7 @@ export async function getAdvocates(): Promise<SelectAdvocate[]> {
 }
 
 export async function getAdvocatesWithSpecialties(searchQuery = ""): Promise<AdvocateWithSpecialties[]> {
+  // First get advocates that match the search query
   const advocates = await db
     .selectDistinct({
       id: AdvocatesTable.id,
@@ -53,6 +54,14 @@ export async function getAdvocatesWithSpecialties(searchQuery = ""): Promise<Adv
       createdAt: AdvocatesTable.createdAt,
     })
     .from(AdvocatesTable)
+    .leftJoin(
+      AdvocateSpecialtiesTable,
+      eq(AdvocatesTable.id, AdvocateSpecialtiesTable.advocateId)
+    )
+    .leftJoin(
+      SpecialtiesTable,
+      eq(AdvocateSpecialtiesTable.specialtyId, SpecialtiesTable.id)
+    )
     .where(
       searchQuery
         ? or(
@@ -60,13 +69,15 @@ export async function getAdvocatesWithSpecialties(searchQuery = ""): Promise<Adv
             ilike(AdvocatesTable.lastName, `%${searchQuery}%`),
             ilike(AdvocatesTable.city, `%${searchQuery}%`),
             ilike(AdvocatesTable.degree, `%${searchQuery}%`),
-            ilike(AdvocatesTable.phoneNumber, `%${searchQuery}%`)
+            ilike(AdvocatesTable.phoneNumber, `%${searchQuery}%`),
+            ilike(SpecialtiesTable.name, `%${searchQuery}%`)
           )
         : undefined
     );
 
   const advocateIds = advocates.map(a => a.id);
-  // Get specialties separately
+
+  // Get all specialties for the matched advocates
   const specialties = await db
     .select({
       advocateId: AdvocateSpecialtiesTable.advocateId,
@@ -77,11 +88,7 @@ export async function getAdvocatesWithSpecialties(searchQuery = ""): Promise<Adv
       SpecialtiesTable,
       eq(AdvocateSpecialtiesTable.specialtyId, SpecialtiesTable.id)
     )
-    .where(
-      searchQuery
-        ? inArray(AdvocateSpecialtiesTable.advocateId, advocateIds)
-        : undefined
-    );
+    .where(inArray(AdvocateSpecialtiesTable.advocateId, advocateIds));
 
   return advocates.map(advocate => ({
     ...advocate,

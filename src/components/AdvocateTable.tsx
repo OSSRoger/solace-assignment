@@ -18,29 +18,35 @@ const formatPhoneNumber = (phoneNumber: string) => {
 };
 
 export default function AdvocateTable({ initialAdvocates }: Props) {
-  const [advocates, setAdvocates] =
-    useState<AdvocateWithSpecialties[]>(initialAdvocates);
+  const [advocates, setAdvocates] = useState<AdvocateWithSpecialties[]>(initialAdvocates);
+  const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const searchTermRef = useRef<HTMLSpanElement>(null);
 
-  const debouncedSearch = useDebouncedCallback(async (searchTerm: string) => {
+  const debouncedSearch = useDebouncedCallback(async (term: string) => {
     setIsLoading(true);
     try {
-      if (searchTermRef.current) {
-        searchTermRef.current.textContent = searchTerm;
-      }
       const response = await fetch(
-        `/api/advocates?q=${encodeURIComponent(searchTerm)}`
+        `/api/advocates?q=${encodeURIComponent(term)}`
       );
       const data = await response.json();
-      console.log(data);
       setAdvocates(data.data);
     } catch (error) {
       console.error("Error searching advocates:", error);
     } finally {
       setIsLoading(false);
     }
-  }, 300);
+  }, 500);
+
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const term = e.target.value;
+    setSearchTerm(term);
+    debouncedSearch(term);
+  };
+
+  const handleReset = () => {
+    setSearchTerm('');
+    setAdvocates(initialAdvocates);
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -48,21 +54,23 @@ export default function AdvocateTable({ initialAdvocates }: Props) {
         <h2 className="text-lg font-semibold mb-2">Search Advocates</h2>
         <div className="flex gap-4 items-center">
           <input
+            value={searchTerm}
+            onChange={handleSearch}
             className="px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            onChange={(e) => debouncedSearch(e.target.value)}
             placeholder="Search by name, city, specialty..."
           />
           <button
-            onClick={() => setAdvocates(initialAdvocates)}
+            onClick={handleReset}
             className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
           >
             Reset
           </button>
         </div>
-        <p className="mt-2 text-sm text-gray-600">
-          Searching for:{" "}
-          <span ref={searchTermRef} className="font-medium"></span>
-        </p>
+        {searchTerm && (
+          <p className="mt-2 text-sm text-gray-600">
+            Searching for: <span className="font-medium">{searchTerm}</span>
+          </p>
+        )}
       </div>
 
       {isLoading ? (
