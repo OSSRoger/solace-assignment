@@ -1,6 +1,6 @@
 TODO: The following are the things that I want to do to improve the table.
 
--  Inestiage using FTS for searching advocates
+-  Investigate using FTS for searching advocates
 -  Implement a cache using React Query
 -  Upgrade to Next.js 15 to avoid issues with unwanted caching
 -  Add better loading state to the table
