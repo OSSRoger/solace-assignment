@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, ilike, or, sql, inArray } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import db from "..";
@@ -40,9 +40,9 @@ export async function getAdvocates(): Promise<SelectAdvocate[]> {
    return await db.select().from(AdvocatesTable);
 }
 
-export async function getAdvocatesWithSpecialties(): Promise<AdvocateWithSpecialties[]> {
+export async function getAdvocatesWithSpecialties(searchQuery = ""): Promise<AdvocateWithSpecialties[]> {
   const advocates = await db
-    .select({
+    .selectDistinct({
       id: AdvocatesTable.id,
       firstName: AdvocatesTable.firstName,
       lastName: AdvocatesTable.lastName,
@@ -52,9 +52,22 @@ export async function getAdvocatesWithSpecialties(): Promise<AdvocateWithSpecial
       phoneNumber: AdvocatesTable.phoneNumber,
       createdAt: AdvocatesTable.createdAt,
     })
-    .from(AdvocatesTable);
+    .from(AdvocatesTable)
+    .where(
+      searchQuery
+        ? or(
+            ilike(AdvocatesTable.firstName, `%${searchQuery}%`),
+            ilike(AdvocatesTable.lastName, `%${searchQuery}%`),
+            ilike(AdvocatesTable.city, `%${searchQuery}%`),
+            ilike(AdvocatesTable.degree, `%${searchQuery}%`),
+            ilike(AdvocatesTable.phoneNumber, `%${searchQuery}%`)
+          )
+        : undefined
+    );
 
-  const advocateSpecialties = await db
+  const advocateIds = advocates.map(a => a.id);
+  // Get specialties separately
+  const specialties = await db
     .select({
       advocateId: AdvocateSpecialtiesTable.advocateId,
       specialty: SpecialtiesTable,
@@ -63,13 +76,18 @@ export async function getAdvocatesWithSpecialties(): Promise<AdvocateWithSpecial
     .innerJoin(
       SpecialtiesTable,
       eq(AdvocateSpecialtiesTable.specialtyId, SpecialtiesTable.id)
+    )
+    .where(
+      searchQuery
+        ? inArray(AdvocateSpecialtiesTable.advocateId, advocateIds)
+        : undefined
     );
 
   return advocates.map(advocate => ({
     ...advocate,
-    specialties: advocateSpecialties
-      .filter(as => as.advocateId === advocate.id)
-      .map(as => as.specialty)
+    specialties: specialties
+      .filter(s => s.advocateId === advocate.id)
+      .map(s => s.specialty)
   }));
 }
 
